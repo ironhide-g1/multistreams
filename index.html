@@ -1,0 +1,289 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>IronHide G1 Multistream</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            position: relative; /* For absolute positioning of the logo */
+        }
+        .input-container {
+            padding: 5px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .input-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        input[type="text"] {
+            width: 370px; /* Correct size for 2 more letters than original */
+            padding: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 6px 12px;
+            font-size: 14px;
+            cursor: pointer;
+            margin: 5px auto;
+            display: block;
+        }
+        .video-container {
+            flex: 1;
+            padding: 10px;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+        .video-frame {
+            border: none;
+            box-sizing: border-box;
+        }
+        .logo {
+            position: absolute;
+            top: 5px; /* Match the padding of input-container */
+            left: 50px; /* 50px from the left edge */
+            height: 106px; /* Matches the height of input-container */
+            width: 300px; /* Limited width */
+            object-fit: contain; /* Ensure the image scales properly */
+        }
+        /* 1 video: ocupa todo */
+        .layout-1 .video-frame {
+            width: 100%;
+            height: 100%;
+        }
+        /* 2 videos: lado a lado */
+        .layout-2 {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .layout-2 .video-frame {
+            width: calc(50% - 5px);
+            height: 100%;
+        }
+        /* 3 videos: 2 arriba, 1 abajo centrado */
+        .layout-3 {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            gap: 10px;
+        }
+        .layout-3 .top-row {
+            display: flex;
+            width: 100%;
+            height: 50%;
+            gap: 10px;
+        }
+        .layout-3 .top-row .video-frame {
+            width: calc(50% - 5px);
+            height: 100%;
+        }
+        .layout-3 .bottom-row {
+            display: flex;
+            width: 100%;
+            height: 50%;
+            justify-content: center;
+            align-items: center;
+        }
+        .layout-3 .bottom-row .video-frame {
+            width: 50%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            display: block;
+        }
+        /* 4 videos: cuadrícula 2x2 */
+        .layout-4 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 10px;
+        }
+        .layout-4 .video-frame {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <img src="logo.png" alt="IronHide G1 Logo" class="logo">
+    <div class="input-container">
+        <div class="input-row">
+            <input type="text" id="url1" placeholder="Pega la URL de YouTube o Twitch 1">
+            <input type="text" id="url2" placeholder="Pega la URL de YouTube o Twitch 2">
+        </div>
+        <div class="input-row">
+            <input type="text" id="url3" placeholder="Pega la URL de YouTube o Twitch 3">
+            <input type="text" id="url4" placeholder="Pega la URL de YouTube o Twitch 4">
+        </div>
+        <button onclick="loadVideos()">Cargar</button>
+    </div>
+    <div class="video-container" id="videoContainer">
+        <!-- Los iframes se generarán dinámicamente -->
+    </div>
+
+    <script>
+        function extractVideoId(url) {
+            // YouTube URL patterns
+            const youtubeRegex = /(?:youtube\.com\/(?:watch\?v=|live\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+            const youtubeMatch = url.match(youtubeRegex);
+            if (youtubeMatch) {
+                return { platform: 'youtube', id: youtubeMatch[1] };
+            }
+
+            // Twitch URL patterns (live streams: twitch.tv/CHANNEL_NAME)
+            const twitchRegex = /twitch\.tv\/([a-zA-Z0-9_]+)/;
+            const twitchMatch = url.match(twitchRegex);
+            if (twitchMatch) {
+                return { platform: 'twitch', id: twitchMatch[1] };
+            }
+
+            return null;
+        }
+
+        function loadVideos() {
+            const urls = [
+                document.getElementById('url1').value,
+                document.getElementById('url2').value,
+                document.getElementById('url3').value,
+                document.getElementById('url4').value
+            ];
+            const videos = urls.map(url => extractVideoId(url)).filter(video => video);
+
+            const videoContainer = document.getElementById('videoContainer');
+            videoContainer.innerHTML = ''; // Limpiar contenedor
+            videoContainer.className = 'video-container'; // Resetear clases
+
+            if (videos.length === 0) {
+                alert('Por favor, introduce al menos una URL válida de YouTube o Twitch.');
+                return;
+            }
+
+            // Dynamically get the parent domain for Twitch embeds
+            const twitchParent = window.location.hostname;
+
+            // Aplicar layout según la cantidad de videos
+            if (videos.length === 1) {
+                videoContainer.classList.add('layout-1');
+                const video = videos[0];
+                if (video.platform === 'youtube') {
+                    videoContainer.innerHTML = `<iframe class="video-frame" src="https://www.youtube.com/embed/${video.id}?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+                } else if (video.platform === 'twitch') {
+                    videoContainer.innerHTML = `<iframe class="video-frame" src="https://player.twitch.tv/?channel=${video.id}&parent=${twitchParent}&autoplay=true" frameborder="0" allowfullscreen="true" scrolling="no"></iframe>`;
+                }
+            } else if (videos.length === 2) {
+                videoContainer.classList.add('layout-2');
+                let html = '';
+                videos.forEach(video => {
+                    if (video.platform === 'youtube') {
+                        html += `<iframe class="video-frame" src="https://www.youtube.com/embed/${video.id}?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+                    } else if (video.platform === 'twitch') {
+                        html += `<iframe class="video-frame" src="https://player.twitch.tv/?channel=${video.id}&parent=${twitchParent}&autoplay=true" frameborder="0" allowfullscreen="true" scrolling="no"></iframe>`;
+                    }
+                });
+                videoContainer.innerHTML = html;
+            } else if (videos.length === 3) {
+                videoContainer.classList.add('layout-3');
+                let topRowHtml = '';
+                let bottomRowHtml = '';
+                for (let i = 0; i < 2; i++) {
+                    const video = videos[i];
+                    if (video.platform === 'youtube') {
+                        topRowHtml += `<iframe class="video-frame" src="https://www.youtube.com/embed/${video.id}?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+                    } else if (video.platform === 'twitch') {
+                        topRowHtml += `<iframe class="video-frame" src="https://player.twitch.tv/?channel=${video.id}&parent=${twitchParent}&autoplay=true" frameborder="0" allowfullscreen="true" scrolling="no"></iframe>`;
+                    }
+                }
+                const video3 = videos[2];
+                if (video3.platform === 'youtube') {
+                    bottomRowHtml = `<iframe class="video-frame" src="https://www.youtube.com/embed/${video3.id}?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+                } else if (video3.platform === 'twitch') {
+                    bottomRowHtml = `<iframe class="video-frame" src="https://player.twitch.tv/?channel=${video3.id}&parent=${twitchParent}&autoplay=true" frameborder="0" allowfullscreen="true" scrolling="no"></iframe>`;
+                }
+                videoContainer.innerHTML = `
+                    <div class="top-row">
+                        ${topRowHtml}
+                    </div>
+                    <div class="bottom-row">
+                        ${bottomRowHtml}
+                    </div>
+                `;
+            } else if (videos.length === 4) {
+                videoContainer.classList.add('layout-4');
+                let html = '';
+                videos.forEach(video => {
+                    if (video.platform === 'youtube') {
+                        html += `<iframe class="video-frame" src="https://www.youtube.com/embed/${video.id}?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+                    } else if (video.platform === 'twitch') {
+                        html += `<iframe class="video-frame" src="https://player.twitch.tv/?channel=${video.id}&parent=${twitchParent}&autoplay=true" frameborder="0" allowfullscreen="true" scrolling="no"></iframe>`;
+                    }
+                });
+                videoContainer.innerHTML = html;
+            }
+        }
+
+        // Permitir cargar con la tecla Enter en cualquier campo
+        ['url1', 'url2', 'url3', 'url4'].forEach(id => {
+            document.getElementById(id).addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    loadVideos();
+                }
+            });
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93e87e8789d2bfd3',t:'MTc0NzAzNzk5OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
